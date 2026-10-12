@@ -1,0 +1,17 @@
+# ---------------------------------------------------------------
+# SOLUTION FILES — deliberately kept out of the public repository
+# until after the game has been presented in class.
+#
+# The rubric says: "Keep solutions private until the game ends."
+# These are submitted privately on Blackboard instead.
+#
+# AFTER presentation day, delete the four lines below and run:
+#     git add -A && git commit -m "Publish host materials after presentation"
+# ---------------------------------------------------------------
+HOST-GUIDE.md
+PRESENTATION-SCRIPT.md
+audio/voicemail-script.md
+audio/make-audio.sh
+
+# macOS
+.DS_Store

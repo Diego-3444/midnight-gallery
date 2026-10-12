@@ -1,0 +1,875 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Midnight Gallery — An Escape Room Investigation</title>
+<style>
+  :root{
+    --ink:#e8e3d9; --ink-dim:#9a9389; --paper:#f4efe4; --paper-ink:#1d1a15;
+    --bg:#0a0a0b; --panel:#1c1c1e; --line:#33322f;
+    --gold:#c8a04a; --red:#c05a4a; --green:#6e9a5a;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--ink); overflow:hidden;
+    font:16px/1.6 "Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  }
+  canvas{display:block; position:fixed; inset:0; z-index:0}
+
+  /* ---------- top bar ---------- */
+  #bar{
+    position:fixed; top:0; left:0; right:0; z-index:20;
+    display:flex; align-items:center; gap:16px; padding:10px 20px; flex-wrap:wrap;
+    background:linear-gradient(#0a0a0bdd,#0a0a0b00); pointer-events:none;
+  }
+  #bar > *{pointer-events:auto}
+  #bar h1{font-size:15px; letter-spacing:.14em; text-transform:uppercase; margin:0; color:var(--gold); font-weight:600}
+  .spacer{flex:1}
+  #clock{font-family:ui-monospace,Menlo,monospace; font-size:26px; font-variant-numeric:tabular-nums}
+  #clock.warn{color:var(--gold)} #clock.danger{color:var(--red)}
+  .locks{display:flex; gap:6px}
+  .pip{width:11px;height:11px;border:1px solid var(--ink-dim);border-radius:50%;transition:.4s}
+  .pip.on{background:var(--green);border-color:var(--green);box-shadow:0 0 10px #6e9a5a}
+
+  button{
+    font:inherit; font-size:14px; cursor:pointer; color:var(--ink);
+    background:#2a2a2cdd; border:1px solid var(--line); border-radius:6px; padding:8px 15px;
+  }
+  button:hover{border-color:var(--ink-dim)}
+  button.primary{background:var(--gold); border-color:var(--gold); color:#1d1a15; font-weight:600}
+  button:disabled{opacity:.4; cursor:default}
+
+  /* ---------- bottom HUD ---------- */
+  #hud{
+    position:fixed; left:0; right:0; bottom:0; z-index:20; padding:18px 22px;
+    background:linear-gradient(#0a0a0b00,#0a0a0bee); pointer-events:none; text-align:center;
+  }
+  #place{font-size:12px; letter-spacing:.2em; text-transform:uppercase; color:var(--gold)}
+  #task{font-size:17px; margin-top:4px}
+  #tip{font-size:12px; color:var(--ink-dim); margin-top:7px; letter-spacing:.04em}
+
+  /* ---------- 3D hotspot labels ---------- */
+  #labels{position:fixed; inset:0; z-index:10; pointer-events:none}
+  .lab{
+    position:absolute; transform:translate(-50%,-50%);
+    font-size:11px; letter-spacing:.16em; text-transform:uppercase; white-space:nowrap;
+    color:var(--gold); background:#0a0a0bcc; border:1px solid #c8a04a66;
+    border-radius:3px; padding:4px 9px; transition:opacity .3s, border-color .2s;
+  }
+  .lab.hot{border-color:var(--gold); color:#fff; background:#c8a04a33}
+
+  /* ---------- overlays ---------- */
+  .sheet{
+    position:fixed; inset:0; z-index:30; display:none; overflow-y:auto;
+    background:#0a0a0bf2; backdrop-filter:blur(6px); padding:70px 20px 40px;
+  }
+  .sheet.open{display:block}
+  .wrap{max-width:820px; margin:0 auto}
+  #panel .wrap{max-width:780px}
+
+  .doc{background:var(--paper); color:var(--paper-ink); border-radius:3px; padding:26px 30px; margin:0 0 20px; box-shadow:0 16px 50px #000a}
+  .doc h3{margin:0 0 4px; font-size:12px; letter-spacing:.17em; text-transform:uppercase; border-bottom:1.5px solid var(--paper-ink); padding-bottom:7px}
+  .doc .sub{font-size:12px; letter-spacing:.09em; text-transform:uppercase; color:#6c6458; margin:7px 0 16px}
+  .doc pre{font-family:ui-monospace,Menlo,monospace; font-size:13px; line-height:1.75; white-space:pre-wrap; margin:0; overflow-x:auto}
+  .doc p{margin:0 0 13px} .doc p:last-child{margin-bottom:0}
+  .doc .signoff{margin-top:16px; font-style:italic}
+  .stmt{border-left:3px solid #c9bda4; padding:2px 0 2px 16px; margin:18px 0}
+  .stmt .who{font-weight:700; font-size:14px}
+  .stmt .role{font-size:12px; color:#6c6458; text-transform:uppercase; letter-spacing:.08em; margin-bottom:9px}
+  .stmt q{font-style:italic}
+
+  .task{background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:20px 22px; margin:22px 0}
+  .task .q{font-weight:600; margin:0 0 15px}
+  .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+  input[type=text]{
+    font:inherit; font-size:19px; letter-spacing:.1em; text-align:center;
+    background:#0e0e0f; color:var(--ink); border:1px solid var(--line); border-radius:6px; padding:11px 14px; width:260px;
+  }
+  input[type=text]:focus{outline:none; border-color:var(--gold)}
+  .fb{min-height:24px; margin-top:13px; font-size:14px}
+  .fb.bad{color:var(--red)} .fb.good{color:var(--green)}
+  .hintbox{margin-top:16px; border-top:1px solid var(--line); padding-top:14px}
+  .hint{font-size:14px; color:var(--gold); background:#c8a04a14; border-left:2px solid var(--gold); padding:9px 14px; margin:9px 0}
+  audio{width:100%; margin:6px 0 4px; filter:invert(.9) hue-rotate(180deg)}
+  .note{font-size:13px; color:var(--ink-dim)}
+  .closebar{position:sticky; top:-70px; margin:-70px -20px 18px; padding:14px 20px; background:#0a0a0bee; z-index:2}
+
+  h2{font-size:30px; margin:6px 0 10px; line-height:1.25}
+  .tag{display:inline-block; font-size:11px; letter-spacing:.15em; text-transform:uppercase; color:var(--gold); border:1px solid var(--gold); border-radius:3px; padding:3px 9px; margin-bottom:14px}
+  .brief{color:var(--ink-dim); font-style:italic; border-left:2px solid var(--line); padding-left:16px; margin:16px 0 24px}
+  .rules{background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:20px 24px; margin:22px 0}
+  .rules ul{margin:10px 0 0; padding-left:20px} .rules li{margin-bottom:7px}
+  .cast{display:grid; grid-template-columns:repeat(auto-fit,minmax(185px,1fr)); gap:12px; margin:18px 0}
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:14px 16px}
+  .card .n{font-weight:700; font-size:15px}
+  .card .r{font-size:12px; color:var(--ink-dim); text-transform:uppercase; letter-spacing:.07em}
+  .final{text-align:center; padding:30px 0}
+  .final .big{font-size:42px; color:var(--gold); margin:0 0 6px}
+  .accuse{text-align:left; background:var(--panel); border:1px solid var(--gold); border-radius:8px; padding:22px 24px; margin:24px 0}
+  .accuse ol{margin:12px 0 0; padding-left:22px} .accuse li{margin-bottom:9px}
+  .stats{font-family:ui-monospace,Menlo,monospace; font-size:14px; color:var(--ink-dim); margin-top:20px}
+
+  #boot{position:fixed; inset:0; z-index:50; display:grid; place-items:center; background:var(--bg); text-align:center; padding:30px}
+  #boot .t{font-size:13px; letter-spacing:.3em; text-transform:uppercase; color:var(--gold)}
+  #boot .m{color:var(--ink-dim); font-size:14px; margin-top:12px; max-width:520px}
+</style>
+</head>
+<body>
+
+<div id="boot"><div><div class="t">Hollowbrook Museum</div><div class="m" id="bootmsg">Entering the building…</div></div></div>
+
+<div id="labels"></div>
+
+<div id="bar">
+  <h1>The Midnight Gallery</h1>
+  <div class="locks"><div class="pip" id="p1"></div><div class="pip" id="p2"></div><div class="pip" id="p3"></div><div class="pip" id="p4"></div></div>
+  <div class="spacer"></div>
+  <div id="clock">20:00</div>
+  <button id="timerBtn">Start</button>
+</div>
+
+<div id="hud">
+  <div id="place">Gallery 4</div>
+  <div id="task">Find the person who cannot have been where they say they were.</div>
+  <div id="tip">Drag to look around · click a glowing marker to read the evidence</div>
+</div>
+
+<!-- ========== BRIEFING ========== -->
+<div class="sheet open" id="intro"><div class="wrap">
+  <span class="tag">Case file 2-6 · Hollowbrook Museum</span>
+  <h2>A painting left this building last night. Nobody opened a door.</h2>
+  <div class="doc">
+    <h3>Police Briefing</h3>
+    <div class="sub">Saturday 3 October · 07:00 · Hollowbrook Museum of Modern Art</div>
+    <p>At some point on Friday night, <em>The Sleeping Lighthouse</em> by Amara Reyes was taken
+    from Gallery 4. The painting is worth more than the rest of the collection together.</p>
+    <p>The main alarm never went off. No window was broken. No door was forced. Whoever took the
+    painting walked in, walked out, and used a staff access card to do it.</p>
+    <p>Only four people hold cards for this wing. All four have given a statement. All four sound
+    honest. One of them is lying, and the lie is in writing.</p>
+    <p><strong>Your mission:</strong> find the thief, find the buyer, and open the loading-bay
+    vault before the museum opens at nine o'clock. You have twenty minutes.</p>
+  </div>
+  <h3 style="letter-spacing:.14em;text-transform:uppercase;font-size:12px;color:var(--ink-dim)">The four keyholders</h3>
+  <div class="cast">
+    <div class="card"><div class="n">Dr. Helena Voss</div><div class="r">Chief Curator</div></div>
+    <div class="card"><div class="n">Marcus Oyelaran</div><div class="r">Night Security</div></div>
+    <div class="card"><div class="n">Priya Raman</div><div class="r">Restoration Technician</div></div>
+    <div class="card"><div class="n">Tomás Adler</div><div class="r">Gift Shop Manager</div></div>
+  </div>
+  <div class="rules">
+    <strong>Rules</strong>
+    <ul>
+      <li>Everything is in English. Discuss your reasoning out loud, in English.</li>
+      <li>There are <strong>four locks</strong>. Each answer opens the next room.</li>
+      <li><strong>Drag</strong> the room to look around. <strong>Click</strong> a glowing marker to read a document.</li>
+      <li>Read every document before you guess. The answer is always in the evidence.</li>
+      <li>Ask the host for a hint at any time. Hints are free, but we count them.</li>
+      <li>When the vault opens you must <strong>explain the case out loud</strong>. The vault is not the end — the explanation is.</li>
+    </ul>
+  </div>
+  <div class="row"><button class="primary" id="startBtn">Enter Gallery 4</button></div>
+</div></div>
+
+<!-- ========== DOCUMENT PANEL ========== -->
+<div class="sheet" id="panel"><div class="wrap">
+  <div class="closebar"><button id="closeBtn">← Back to the room</button></div>
+  <div id="panelBody"></div>
+</div></div>
+
+<!-- ========== FINAL ========== -->
+<div class="sheet" id="final"><div class="wrap">
+  <div class="final">
+    <p class="big">The vault is open.</p>
+    <p><em>The Sleeping Lighthouse</em> is inside crate HB-7741, wrapped in a shop apron. It never left the building.</p>
+  </div>
+  <div class="accuse">
+    <strong>You have the painting. Now close the case — out loud, in English.</strong>
+    <p class="note" style="margin-top:10px">The host will ask each of you one of these. Answer in
+    full sentences and say <em>which document or recording</em> proves it.</p>
+    <ol>
+      <li>Who took the painting, and what exactly was wrong with their statement?</li>
+      <li>Tomás Adler's card only opens the gift shop and the loading bay. So <strong>how did he get into Gallery 4</strong>, and how do you know?</li>
+      <li>Priya Raman's card opened Gallery 4 at 22:08. Why is she not the thief?</li>
+      <li>Who was the buyer, and how did you work out his name from two different documents?</li>
+      <li>The camera went into "maintenance mode" at 22:30. Who could do that, and why does that matter?</li>
+      <li>Give one piece of information that you could <strong>only</strong> get from the voicemail.</li>
+    </ol>
+  </div>
+  <div class="final">
+    <div class="stats" id="stats"></div>
+    <p style="margin-top:24px"><button onclick="location.reload()">Reset for the next team</button></p>
+  </div>
+</div></div>
+
+<script type="importmap">
+{"imports":{"three":"./vendor/three.module.min.js"}}
+</script>
+
+<script type="module">
+import * as T from 'three';
+
+/* ============================================================
+   1. PUZZLE LOGIC  (answers hashed so View Source does not spoil)
+   ============================================================ */
+const dec=s=>new TextDecoder().decode(Uint8Array.from(atob(s),c=>c.charCodeAt(0)));
+function norm(s){return s.normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().replace(/[^a-z0-9]/g,"");}
+function H(s){let x=5381;for(const c of norm(s))x=((x*33)^c.charCodeAt(0))>>>0;return x.toString(16);}
+
+const ANSWERS={1:["596867","a15d9e7b","a1cf0bb","214b6bff"],2:["b8658ba","119926cb"],3:["afe60376","faaaa4d9"],4:["7c548f46"]};
+const NUDGE={1:{"596802":"TG9ja2VyIDA3IGlzIE1hcmN1cy4gSGUgcmVwb3J0ZWQgdGhlIHRoZWZ0IGhpbXNlbGYsIGFuZCB0aGUgbG9nIHB1dHMgaGltIGV4YWN0bHkgd2hlcmUgaGUgc2F5cy4gUmVhZCB0aGUgZm91cnRoIHN0YXRlbWVudCBhZ2Fpbi4=","596820":"TG9ja2VyIDE0IGlzIERyLiBWb3NzLiBIZXIgc3RhdGVtZW50IG1hdGNoZXMgRG9jdW1lbnQgQSBsaW5lIGJ5IGxpbmUg4oCUIGFuZCBoZXIgbmVpZ2hib3VyIHNhdyBoZXIgYXQgaG9tZS4gVHJ5IGFnYWluLg==","596845":"TG9ja2VyIDIyIGlzIFByaXlhLiBIZXIgY2FyZCA8ZW0+d2FzPC9lbT4gdXNlZCBhdCAyMjowOCDigJQgYnV0IHNoZSB3YXMgYXQgYSB3ZWRkaW5nIGluIE1vbnRlcnJleS4gU28gd2hvIHVzZWQgaXQ/","7c76f1fc":"RHIuIFZvc3MncyBzdGF0ZW1lbnQgbWF0Y2hlcyBEb2N1bWVudCBBIGxpbmUgYnkgbGluZSwgYW5kIGhlciBuZWlnaGJvdXIgc2F3IGhlciBhdCBob21lLiBUcnkgYWdhaW4u","e9a3e906":"TWFyY3VzIHJlcG9ydGVkIHRoZSB0aGVmdCBoaW1zZWxmIGFuZCB0aGUgbG9nIHB1dHMgaGltIGV4YWN0bHkgd2hlcmUgaGUgc2F5cy4gUmVhZCB0aGUgZm91cnRoIHN0YXRlbWVudCBhZ2Fpbi4=","b9a7214":"UHJpeWEncyBjYXJkIHdhcyB1c2VkIGF0IDIyOjA4IOKAlCBidXQgc2hlIHdhcyBhdCBhIHdlZGRpbmcgaW4gTW9udGVycmV5LiBTbyB3aG8gdXNlZCBpdD8="},2:{},3:{"a6655ed":"Si4gTWJla2kgaXMgdGhlIGNvbnRhY3QgZm9yIHRoZSBOb3J0aGVybiBIYXJib3VyIFRydXN0LCBub3QgdGhlIGFxdWFyaXVtLiBSZWFkIHRoZSByZWdpc3RlciBhZ2Fpbi4=","6b618ee7":"Si4gTWJla2kgaXMgdGhlIGNvbnRhY3QgZm9yIHRoZSBOb3J0aGVybiBIYXJib3VyIFRydXN0LCBub3QgdGhlIGFxdWFyaXVtLiBSZWFkIHRoZSByZWdpc3RlciBhZ2Fpbi4=","aa600339":"Ui4gRmVycmVpcmEgaXMgdGhlIENpbmV0ZWNhIGNvbnRhY3Qg4oCUIGEgY29pbmNpZGVuY2UsIG5vdCB5b3VyIGJ1eWVyLiBXaGljaCBpbnN0aXR1dGlvbiBhcHBlYXJzIDxlbT50d2ljZTwvZW0+Pw==","7ca5fb6b":"Ui4gRmVycmVpcmEgaXMgdGhlIENpbmV0ZWNhIGNvbnRhY3Qg4oCUIGEgY29pbmNpZGVuY2UsIG5vdCB5b3VyIGJ1eWVyLiBXaGljaCBpbnN0aXR1dGlvbiBhcHBlYXJzIDxlbT50d2ljZTwvZW0+Pw=="},4:{"7c540ba7":"UmlnaHQgZXZlbnQsIHdyb25nIGNsb2NrLiBab25lIDcgd3JpdGVzIGEgMTItaG91ciBjbG9jazsgdGhlIGtleXBhZCB3YW50cyAyNC1ob3VyLg==","e1859fba":"UmlnaHQgZXZlbnQsIHdyb25nIGZvcm1hdC4gQ29udmVydCAxMTowMiBQTSB0byB0aGUgMjQtaG91ciBjbG9jayDigJQgZm91ciBkaWdpdHMsIG5vIGNvbG9uLCBubyBsZXR0ZXJzLg=="}};
+const HINTS={1:["VGhyZWUgc3RhdGVtZW50cyBhZ3JlZSB3aXRoIHRoZSBhY2Nlc3MgbG9nLiBDaGVjayBlYWNoIHBlcnNvbidzIHRpbWVzIGFnYWluc3QgaXQsIG9uZSBsaW5lIGF0IGEgdGltZS4=","Tm9ib2R5IGNvbnRyYWRpY3RzIHRoZSBsb2cuIE9uZSBwZXJzb24gY29udHJhZGljdHMgPGVtPnRoZW1zZWx2ZXM8L2VtPi4gTG9vayBmb3IgYSBzdGF0ZW1lbnQgd2l0aCB0d28gdGltZXMgaW4gaXQgdGhhdCBjYW5ub3QgYm90aCBiZSB0cnVlLg==","QWRsZXIgc2F5cyBoZSBsZWZ0IGF0IDk6Mzgg4oCUIGFuZCB0aGF0IGhlIHdhcyBpbnNpZGUgdGhlIGNpbmVtYSBmcm9tIDk6MzAgb253YXJkcy4gVGhlIHN0YWZmIGRpcmVjdG9yeSBnaXZlcyB5b3UgaGlzIGxvY2tlci4="],2:["TWFyY3VzIGFza3MgRHIuIFZvc3MgdG8gd3JpdGUgdHdvIHRoaW5ncyBkb3duLiBUaGUgcGxhdGUgaXMgb25lIG9mIHRoZW0u","SGUgc2F5cyBoZSBpcyByZWFkaW5nIGl0IG9mZiBhIGNhbWVyYSBtb25pdG9yLCBhbmQgaGUgcmVwZWF0cyB0aGUgdGhyZWUgZGlnaXRzIHNsb3dseSwgdHdpY2Uu","TGlzdGVuIGZvciDigJxmb3VyIOKAlCBuaW5lIOKAlCB0d2/igJ0gbmVhciB0aGUgZW5kIG9mIHRoZSBtZXNzYWdlLg=="],3:["VGhlIGVtYWlsIG5ldmVyIG5hbWVzIHRoZSBidXllci4gSXQgdGVsbHMgeW91IHdoZXJlIHRvIGxvb2sgaGltIHVwLg==","V2hpY2ggaW5zdGl0dXRpb24gYXBwZWFycyA8ZW0+dHdpY2U8L2VtPiBpbiB0aGUgbG9hbiByZWdpc3Rlcj8gVGhlIGJ1eWVyIHVzZWQgdGhlIHNhbWUgY29udGFjdCBmb3IgYm90aCBvZiB0aG9zZSBsb2Fucy4=","TC0xMTggYW5kIEwtMTIxIGJvdGggd2VudCB0byB0aGUgUGFjaWZpYyBBcXVhcml1bSBGb3VuZGF0aW9uLCBhbmQgYm90aCBsaXN0IHRoZSBzYW1lIGNvbnRhY3Q6IE8uIENhc3RlbGxhbm9zLiBUaGUgcmVsZWFzZSB3b3JkIGlzIGhpcyBzdXJuYW1lLg=="],4:["VGhlIGxvYWRpbmcgYmF5IGxvZyBoYXMgc2l4IGxpbmVzLiBPbmx5IG9uZSBvZiB0aGVtIGlzIHRoZSBjcmF0ZSBsZWF2aW5nIHRoZSBidWlsZGluZy4=","VGhlIGNyYXRlIGlzIG5hbWVkIG9uIGV4YWN0bHkgb25lIGxpbmU6IEhCLTc3NDEsIGFuIEVYSVQgYXQgMTE6MDIgUE0u","MTE6MDIgUE0gaW4gMjQtaG91ciBmb3JtYXQgaXMgMjM6MDIuIFRoZSBrZXlwYWQgd2FudHMgZm91ciBkaWdpdHMgYW5kIG5vIGNvbG9uLg=="]};
+
+/* ============================================================
+   2. EVIDENCE DOCUMENTS
+   ============================================================ */
+const DOC={};
+DOC.log=`<div class="doc"><h3>Document A — Access Log</h3>
+<div class="sub">Zone 4: Gallery 4 &amp; West staff door · Friday 2 October</div>
+<pre>  TIME    EVENT    LOCATION            CARD   HOLDER
+
+  21:04   ENTRY    West staff door     #002   M. Oyelaran
+  21:38   EXIT     West staff door     #004   T. Adler
+  21:40   ENTRY    Gallery 4           #001   H. Voss
+  21:45   EXIT     Gallery 4           #001   H. Voss
+  21:52   ENTRY    Gallery 4           #002   M. Oyelaran
+  22:05   EXIT     Gallery 4           #002   M. Oyelaran
+  22:08   ENTRY    Gallery 4           #003   P. Raman
+  22:14   EXIT     Gallery 4           #003   P. Raman
+  22:16   ENTRY    Gallery 4           #002   M. Oyelaran
+
+  --- CAMERA G4-02 · automatic still every 15 minutes ---
+
+  21:45   "The Sleeping Lighthouse"  ON WALL
+  22:00   "The Sleeping Lighthouse"  ON WALL
+  22:15   "The Sleeping Lighthouse"  NOT VISIBLE — bracket empty
+  22:30   camera offline (maintenance mode)</pre></div>`;
+
+DOC.stmts=`<div class="doc"><h3>Document B — Witness Statements</h3>
+<div class="sub">Taken Saturday 3 October, 07:20–08:05</div>
+<div class="stmt"><div class="who">Dr. Helena Voss</div><div class="role">Chief Curator · card #001</div>
+<q>I was working late on the autumn catalogue. I did a final check of Gallery 4 at twenty to ten
+and I locked the connecting door at a quarter to ten. The Reyes was on the wall — I remember
+straightening the label. Then I drove home. My neighbour, Mrs Haddad, was putting out her bins
+when I arrived and we talked for a minute. That was just after ten. I have not been back in this
+building since.</q></div>
+<div class="stmt"><div class="who">Marcus Oyelaran</div><div class="role">Night Security · card #002</div>
+<q>My shift started at nine. I walked through Gallery 4 at nine fifty-two and everything was
+normal — the Reyes was on the wall and I signed the round sheet. At five past ten I heard glass
+breaking in the east corridor, so I left the gallery to check it. I found nothing broken, nothing
+at all. I came back about ten minutes later and the painting had gone. I phoned Dr. Voss's office
+immediately and left a message. After that I was writing my incident report in the security office
+until the end of my shift.</q></div>
+<div class="stmt"><div class="who">Priya Raman</div><div class="role">Restoration Technician · card #003</div>
+<q>I was not even in the city on Friday. My sister got married in Monterrey on Saturday and I flew
+out on Thursday evening — I can show you the boarding pass. The last time I used my access card
+was Thursday afternoon, in the restoration room. I have no idea how it could have opened anything
+on Friday night. I have worked here for six years and I have never lost a card.</q></div>
+<div class="stmt"><div class="who">Tomás Adler</div><div class="role">Gift Shop Manager · card #004</div>
+<q>I closed the shop and left through the west staff door at nine thirty-eight — it's in the log,
+you can check it yourselves. I met my girlfriend at the Cineteca and we watched the nine thirty
+showing of <em>Low Tide</em>. The film is two hours and ten minutes long, so we were inside that
+cinema the whole time, from half past nine until twenty to twelve. I came back on Saturday morning
+and that is when I heard about the painting.</q></div></div>`;
+
+DOC.dir=`<div class="doc"><h3>Document C — Staff Directory</h3>
+<div class="sub">Access levels &amp; staff lockers · west wing</div>
+<pre>  CARD  NAME              ACCESS LEVEL                      LOCKER
+
+  #001  Dr. H. Voss       all galleries · vault · bay          14
+  #002  M. Oyelaran       all galleries · loading bay          07
+  #003  P. Raman          all galleries · restoration room     22
+  #004  T. Adler          gift shop · loading bay only         31</pre></div>`;
+
+DOC.vm=`<div class="doc"><h3>Document D — Voicemail</h3>
+<div class="sub">Friday 2 October · 22:18 · M. Oyelaran → office of H. Voss · 1 min 39 s</div>
+<audio controls preload="metadata" src="audio/voicemail.m4a"></audio>
+<p class="note" style="color:#6c6458">Listen as many times as you need. There is no transcript —
+the detail you need was never written down anywhere. If the audio does not play, ask the host to
+read the message aloud.</p></div>`;
+
+DOC.email=`<div class="doc"><h3>Document E — Email Thread (printed)</h3>
+<div class="sub">Recovered from storage unit 118 · 2 messages</div>
+<pre style="font-size:12.5px">From:    t.adler@hollowbrook-museum.org
+To:      collector@silentbids.net
+Date:    Friday 25 September, 18:02
+Subject: Re: the lighthouse</pre>
+<p style="margin-top:14px">This is the last time I do this. The shop accounts are short and the
+auditors arrive on the 12th, so I need the money before then.</p>
+<p>Your client has to sign for the crate himself, in person. The name on the release form has to
+be a name the loading-bay staff already recognise, or they will stop him at the gate and open the
+crate. Use the same authorised contact he used for <strong>both of the Pacific Aquarium loans</strong>.
+Nobody will look twice at that one.</p>
+<p>And do not bring the van through the main gate.</p>
+<hr style="border:none;border-top:1px dashed #b5a98f;margin:22px 0">
+<pre style="font-size:12.5px">From:    collector@silentbids.net
+To:      t.adler@hollowbrook-museum.org
+Date:    Friday 25 September, 19:30
+Subject: Re: the lighthouse</pre>
+<p style="margin-top:14px">Agreed. He will sign under that name, and the vault release word stays
+the same as the signature: <strong>his surname, nothing else.</strong></p>
+<p>The van is white, no markings. Ten o'clock.</p>
+<div class="signoff">— C.</div></div>`;
+
+DOC.reg=`<div class="doc"><h3>Document F — Outgoing Loan Register</h3>
+<div class="sub">Hollowbrook Museum · 2024–2026</div>
+<pre>  REF     WORK                  BORROWING INSTITUTION
+          authorised contact
+
+  L-114   "Harbour Light"       Northern Harbour Trust
+          J. Mbeki
+
+  L-118   "Blue Hour"           Pacific Aquarium Foundation
+          O. Castellanos
+
+  L-119   "Tidewater III"       Northern Harbour Trust
+          J. Mbeki
+
+  L-121   "Salt and Iron"       Pacific Aquarium Foundation
+          O. Castellanos
+
+  L-123   "Low Tide Study"      Cineteca Cultural Programme
+          R. Ferreira</pre></div>`;
+
+DOC.crate=`<div class="doc"><h3>Document G — Crate Release Form</h3>
+<div class="sub">Zone 7 · loading bay</div>
+<pre>  CRATE           HB-7741
+  CONTENTS        1 framed work — DO NOT OPEN
+  RELEASED TO     O. CASTELLANOS   (signature on file)
+  DATE            Friday 2 October
+  TIME OF RELEASE  ____________
+
+  ───────────────────────────────────────────────
+  VAULT KEYPAD · ZONE 7
+
+  Enter the time the crate left this building.
+  24-hour format. Four digits. No colon.
+  ───────────────────────────────────────────────</pre></div>`;
+
+DOC.bay=`<div class="doc"><h3>Document H — Loading Bay Log (Zone 7)</h3>
+<div class="sub">Friday 2 October · local 12-hour clock</div>
+<pre>  TIME       EVENT   CARD   HOLDER       NOTE
+
+   7:15 AM   ENTRY   #004   T. Adler     shop stock delivery
+   7:52 AM   EXIT    #004   T. Adler
+   9:55 PM   ENTRY   #004   T. Adler
+  10:40 PM   ENTRY    ---   no card      bay door held 2 min
+  11:02 PM   EXIT    #004   T. Adler     crate HB-7741
+                                         door held 4 min
+  11:06 PM   EXIT     ---   no card</pre></div>`;
+
+/* the answer box appended under the documents of each lock */
+function taskBox(n,q,sub,ph,btn){
+  return `<div class="task"><p class="q">${q}<br><span class="note">${sub}</span></p>
+  <div class="row"><input type="text" id="i${n}" placeholder="${ph}" autocomplete="off">
+  <button class="primary" data-check="${n}">${btn}</button>
+  <button data-hint="${n}">Hint</button></div>
+  <div class="fb" id="f${n}"></div><div class="hintbox" id="h${n}" style="display:none"></div></div>`;
+}
+
+/* ============================================================
+   3. ROOMS — what each lock shows
+   ============================================================ */
+const ROOMS={
+  1:{place:"Gallery 4", task:"Find the person who cannot have been where they say they were.",
+     docs:{
+       log:{label:"Access Log", at:[-1.95,1.22,.7]},
+       stmts:{label:"Witness Statements", at:[0,1.26,1.0]},
+       dir:{label:"Staff Directory", at:[1.95,1.22,.7]}
+     },
+     body:()=>DOC.log+DOC.stmts+DOC.dir+taskBox(1,
+       "One statement is impossible. Open that person's staff locker.",
+       "Enter the locker number.","LOCKER №","Open locker")},
+  2:{place:"Staff Room · Locker 31", task:"One saved message, from Friday night. Nobody ever played it.",
+     docs:{vm:{label:"Play the voicemail", at:[-.42,1.39,-3.5]}},
+     body:()=>DOC.vm+taskBox(2,
+       "Marcus reads something off a camera monitor. The traffic department needs it.",
+       "Enter the last three digits of the licence plate.","_ _ _","Run the plate")},
+  3:{place:"Storage Unit 118", task:"The buyer is never named. But he has been here before.",
+     docs:{
+       email:{label:"Email Thread", at:[-1.2,1.0,1.9]},
+       reg:{label:"Loan Register", at:[1.2,1.0,1.9]}
+     },
+     body:()=>DOC.email+DOC.reg+taskBox(3,
+       "Who signed for the crate?","Enter the surname only.","SURNAME","Name the buyer")},
+  4:{place:"Zone 7 · Loading Bay", task:"Zone 7 keeps its own records, on a twelve-hour clock.",
+     docs:{
+       crate:{label:"Crate Release Form", at:[-1.25,1.05,2.0]},
+       bay:{label:"Loading Bay Log", at:[1.25,1.05,2.0]}
+     },
+     body:()=>DOC.crate+DOC.bay+taskBox(4,
+       "Open the vault.","Four digits, 24-hour format.","_ _ _ _","Enter code")}
+};
+
+/* ============================================================
+   4. THREE.JS SCENE
+   ============================================================ */
+const canvas=document.createElement('canvas');
+document.body.appendChild(canvas);
+let renderer,scene,camera,raycaster,hotspots=[],clock;
+let yaw=0,pitch=0,targetYaw=0,targetPitch=0,dragging=false,lastX=0,lastY=0,moved=0;
+const labelLayer=document.getElementById('labels');
+
+function initGL(){
+  renderer=new T.WebGLRenderer({canvas,antialias:true,powerPreference:'high-performance'});
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  renderer.setSize(innerWidth,innerHeight);
+  renderer.shadowMap.enabled=true;
+  renderer.shadowMap.type=T.PCFSoftShadowMap;
+  renderer.toneMapping=T.ACESFilmicToneMapping;
+  renderer.toneMappingExposure=1.15;
+  camera=new T.PerspectiveCamera(58,innerWidth/innerHeight,.1,120);
+  raycaster=new T.Raycaster();
+  clock=new T.Clock();
+  addEventListener('resize',()=>{
+    camera.aspect=innerWidth/innerHeight; camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth,innerHeight);
+  });
+}
+
+/* ---- tiny helpers ---- */
+const M=(c,o={})=>new T.MeshStandardMaterial(Object.assign({color:c,roughness:.85,metalness:.05},o));
+function box(w,h,d,mat,x,y,z,parent){
+  const m=new T.Mesh(new T.BoxGeometry(w,h,d),mat);
+  m.position.set(x,y,z); m.castShadow=true; m.receiveShadow=true;
+  (parent||scene).add(m); return m;
+}
+function plane(w,h,mat,x,y,z,rx,ry,parent){
+  const m=new T.Mesh(new T.PlaneGeometry(w,h),mat);
+  m.position.set(x,y,z); m.rotation.set(rx||0,ry||0,0); m.receiveShadow=true;
+  (parent||scene).add(m); return m;
+}
+/* canvas-texture text, used for signs and labels inside the 3D world */
+function textTex(txt,{w=512,h=128,bg='#1b1b1d',fg='#d8d2c6',font='bold 58px ui-monospace, Menlo, monospace'}={}){
+  const c=document.createElement('canvas'); c.width=w; c.height=h;
+  const x=c.getContext('2d');
+  x.fillStyle=bg; x.fillRect(0,0,w,h);
+  x.fillStyle=fg; x.font=font; x.textAlign='center'; x.textBaseline='middle';
+  x.fillText(txt,w/2,h/2);
+  const t=new T.CanvasTexture(c); t.colorSpace=T.SRGBColorSpace; t.anisotropy=4; return t;
+}
+/* a framed canvas on a wall */
+function painting(w,h,colour,x,y,z,ry){
+  const g=new T.Group(); g.position.set(x,y,z); g.rotation.y=ry||0; scene.add(g);
+  box(w+.14,h+.14,.07,M(0x2a2118,{roughness:.6}),0,0,0,g);     // frame
+  box(w,h,.02,M(colour,{roughness:.95}),0,0,.05,g);            // canvas
+  return g;
+}
+function spot(colour,intensity,x,y,z,tx,ty,tz,angle){
+  const s=new T.SpotLight(colour,intensity,30,angle||.5,.55,1.4);
+  s.position.set(x,y,z); s.target.position.set(tx,ty,tz);
+  s.castShadow=true; s.shadow.mapSize.set(1024,1024); s.shadow.bias=-.0022;
+  scene.add(s); scene.add(s.target); return s;
+}
+
+/* ---- hotspot markers ---- */
+function addHotspot(key,label,pos){
+  const g=new T.Group(); g.position.set(pos[0],pos[1],pos[2]);
+  const core=new T.Mesh(new T.SphereGeometry(.055,20,16),
+    new T.MeshBasicMaterial({color:0xffd98a}));
+  const halo=new T.Mesh(new T.RingGeometry(.11,.145,28),
+    new T.MeshBasicMaterial({color:0xc8a04a,transparent:true,opacity:.75,side:T.DoubleSide}));
+  g.add(core,halo); scene.add(g);
+  const light=new T.PointLight(0xffc368,1.1,2.2); g.add(light);
+  const el=document.createElement('div'); el.className='lab'; el.textContent=label;
+  labelLayer.appendChild(el);
+  const hs={key,group:g,core,halo,el,light}; hotspots.push(hs); return hs;
+}
+function clearScene(){
+  hotspots.forEach(h=>h.el.remove()); hotspots=[];
+  if(scene){ scene.traverse(o=>{ if(o.geometry)o.geometry.dispose();
+    if(o.material){ (Array.isArray(o.material)?o.material:[o.material]).forEach(m=>{
+      for(const k in m) if(m[k]&&m[k].isTexture) m[k].dispose(); m.dispose(); }); } }); }
+  scene=new T.Scene();
+}
+
+/* ============================================================
+   5. ROOM BUILDERS
+   ============================================================ */
+function shell(w,d,h,wallCol,floorCol){
+  plane(w,d,M(floorCol,{roughness:.6}),0,0,0,-Math.PI/2);                 // floor
+  plane(w,d,M(0x0c0c0d),0,h,0,Math.PI/2);                                  // ceiling
+  plane(w,h,M(wallCol),0,h/2,-d/2);                                        // back
+  plane(w,h,M(wallCol),0,h/2,d/2,0,Math.PI);                               // front
+  plane(d,h,M(wallCol),-w/2,h/2,0,0,Math.PI/2);                            // left
+  plane(d,h,M(wallCol),w/2,h/2,0,0,-Math.PI/2);                            // right
+}
+
+function buildGallery(){
+  scene.fog=new T.Fog(0x0a0a0b,9,26);
+  scene.add(new T.AmbientLight(0x404a5a,.5));
+  shell(13,13,4.2,0xe4ded2,0x241e18);
+
+  // ceiling light panels
+  for(const x of [-3.6,0,3.6]){
+    plane(2.6,.5,new T.MeshBasicMaterial({color:0xfff2d8}),x,4.15,-1,Math.PI/2);
+    const pl=new T.PointLight(0xffe9c4,14,16,2); pl.position.set(x,3.9,-1); scene.add(pl);
+  }
+
+  // other paintings (atmosphere)
+  painting(1.5,1.1,0x3d5a6c,-4.3,2.0,-6.4);
+  painting(1.1,1.5,0x6b4a3a,-1.4,2.05,-6.4);
+  painting(1.7,1.2,0x4a5640, 4.3,2.0,-6.4);
+  painting(1.2,1.6,0x53405c,-6.4,2.05,-2.2,Math.PI/2);
+  painting(1.4,1.0,0x3a4a52, 6.4,2.0,-2.2,-Math.PI/2);
+  [-4.3,-1.4,4.3].forEach(x=>spot(0xfff0d0,16,x,3.8,-4.6,x,2.0,-6.4,.34));
+
+  // THE EMPTY SPACE — where The Sleeping Lighthouse hung
+  plane(1.75,1.3,M(0xd2ccbf,{roughness:.95}),1.45,2.05,-6.38);   // clean rectangle
+  box(.26,.05,.09,M(0x6d6355,{metalness:.5,roughness:.4}),1.45,2.62,-6.33); // bracket
+  const cold=spot(0x9fc4e8,22,1.45,3.8,-4.4,1.45,2.0,-6.4,.3);
+  // wall label
+  const lab=new T.Mesh(new T.PlaneGeometry(.52,.17),
+    new T.MeshBasicMaterial({map:textTex('REYES',{w:420,h:140,bg:'#e4ded2',fg:'#2a2118',font:'bold 54px Georgia, serif'})}));
+  lab.position.set(1.45,1.22,-6.37); scene.add(lab);
+
+  // rope barrier in front of the empty wall
+  [-.1,3.0].forEach(x=>{
+    box(.07,.95,.07,M(0x8a7a52,{metalness:.7,roughness:.35}),x,.48,-5.3);
+    box(.17,.06,.17,M(0x4a4238,{metalness:.5}),x,.03,-5.3);
+  });
+  box(2.9,.045,.045,M(0x6e1f28,{roughness:.9}),1.45,.86,-5.3);
+
+  // evidence table in the middle of the room, under the markers
+  box(5.6,.12,1.3,M(0x2e2620,{roughness:.7}),0,1.04,.85);
+  [-2.5,0,2.5].forEach(x=>box(.14,1.04,1.1,M(0x241e18),x,.52,.85));
+  // document props laid out on it
+  box(.42,.02,.56,M(0xf0ead9,{roughness:.95}),-1.95,1.11,.7).rotation.y=.22;
+  box(.44,.03,.58,M(0xe8e0cc,{roughness:.95}),0,1.12,1.0);
+  box(.40,.02,.54,M(0xf0ead9,{roughness:.95}),1.95,1.11,.7).rotation.y=-.26;
+  const deskLamp=new T.PointLight(0xffd9a0,9,8); deskLamp.position.set(0,2.6,1.4); scene.add(deskLamp);
+
+  // security camera in the corner
+  const cam=new T.Group(); cam.position.set(-6.0,3.7,-6.0); cam.rotation.y=-Math.PI/4; scene.add(cam);
+  box(.3,.18,.5,M(0x26262a,{metalness:.6,roughness:.4}),0,0,0,cam);
+  const lens=box(.12,.12,.08,M(0x111113,{metalness:.9,roughness:.2}),0,0,.28,cam);
+  const red=new T.Mesh(new T.SphereGeometry(.028,10,8),new T.MeshBasicMaterial({color:0xff3b30}));
+  red.position.set(.1,.07,.24); cam.add(red);
+
+  // doorway
+  box(1.5,2.6,.12,M(0x18140f),-0.0,1.3,6.45);
+
+  camera.position.set(0,1.78,5.1);
+  return {look:new T.Vector3(.25,1.62,-5.2)};
+}
+
+function buildStaffRoom(){
+  scene.fog=new T.Fog(0x0a0a0b,6,20);
+  scene.add(new T.AmbientLight(0x3a4250,.55));
+  shell(9,9,3.2,0xb9bdb6,0x2b2b2d);
+  const pl=new T.PointLight(0xffeccd,16,14,2); pl.position.set(0,3.0,1.2); scene.add(pl);
+
+  // bank of lockers along the back wall
+  const lockerM=M(0x4e6b63,{roughness:.55,metalness:.25});
+  const openM=M(0x2a3a36,{roughness:.8});
+  let n=25;
+  for(let col=0;col<8;col++){
+    for(let row=0;row<2;row++){
+      const x=-3.5+col*1.0, y=row===0?1.72:0.78, is31=(n===31);
+      if(is31){
+        box(.94,.88,.5,openM,x,y,-4.0);                            // open cavity
+        const door=box(.92,.9,.04,lockerM,x-.88,y,-3.72);          // swung-open door
+        door.rotation.y=.85;
+      }else{
+        box(.94,.9,.42,lockerM,x,y,-4.05);
+        box(.06,.16,.03,M(0x9aa49c,{metalness:.8,roughness:.3}),x+.33,y,-3.83);
+      }
+      const t=new T.Mesh(new T.PlaneGeometry(.26,.11),
+        new T.MeshBasicMaterial({map:textTex(String(n),{w:256,h:110,bg:is31?'#c8a04a':'#3c514b',fg:is31?'#1d1a15':'#cfd6cf'})}));
+      t.position.set(x-.24,y+.3,-3.82); scene.add(t);
+      n++;
+    }
+  }
+  // locker 31 sits at col 3, upper row — keep every prop on these coordinates
+  const L31X=-0.5, L31Y=1.72;
+  const warm=new T.PointLight(0xffc368,3.4,3.2); warm.position.set(L31X,L31Y,-3.85); scene.add(warm);
+  // the apron + the handset inside
+  box(.5,.6,.05,M(0x8a5a3c,{roughness:.95}),L31X-.12,L31Y+.02,-4.15);
+  const ph=new T.Group(); ph.position.set(L31X+.08,L31Y-.33,-3.95); scene.add(ph);
+  box(.34,.08,.14,M(0x1b1b1e,{roughness:.5}),0,0,0,ph);
+  box(.09,.1,.13,M(0x1b1b1e,{roughness:.5}),-.14,.07,0,ph);
+  box(.09,.1,.13,M(0x1b1b1e,{roughness:.5}), .14,.07,0,ph);
+
+  // bench
+  box(3.2,.12,.8,M(0x5a4a38,{roughness:.8}),0,.5,-1.6);
+  [-1.4,1.4].forEach(x=>box(.14,.5,.7,M(0x3a3028),x,.25,-1.6));
+
+  camera.position.set(.25,1.62,-.5);
+  return {look:new T.Vector3(L31X,L31Y-.1,-4.0)};
+}
+
+function buildStorage(){
+  scene.fog=new T.Fog(0x08080a,7,22);
+  scene.add(new T.AmbientLight(0x2e3440,.45));
+  shell(12,11,3.6,0x6e6a63,0x3a3835);
+  const bulb=new T.PointLight(0xffd9a8,13,15,2); bulb.position.set(0,3.2,0); scene.add(bulb);
+  const bulbMesh=new T.Mesh(new T.SphereGeometry(.07,12,10),new T.MeshBasicMaterial({color:0xffe6bd}));
+  bulbMesh.position.set(0,3.2,0); scene.add(bulbMesh);
+
+  // roller shutter, partly open
+  const sl=M(0x55585c,{metalness:.5,roughness:.5});
+  for(let i=0;i<9;i++) box(5.0,.26,.1,sl,0,3.52-i*.27,-5.45);
+
+  // THE WHITE VAN — plate deliberately unreadable: this is the listening puzzle
+  const van=new T.Group(); van.position.set(-3.1,0,-1.4); van.rotation.y=.42; scene.add(van);
+  const white=M(0xdedacf,{roughness:.45,metalness:.12});
+  box(2.0,1.35,4.3,white,0,1.25,0,van);                 // cargo body
+  box(1.9,.95,1.35,white,0,.95,2.5,van);                // cabin
+  box(1.8,.55,.08,M(0x171a1f,{roughness:.2,metalness:.5}),0,1.22,3.12,van); // windscreen
+  box(.5,.16,.04,M(0x9a978f,{roughness:.7}),0,.52,-2.18,van);               // blank plate
+  const wheel=new T.CylinderGeometry(.42,.42,.3,18);
+  [[-1.0,-1.3],[1.0,-1.3],[-1.0,2.2],[1.0,2.2]].forEach(([x,z])=>{
+    const w=new T.Mesh(wheel,M(0x16161a,{roughness:.95}));
+    w.rotation.z=Math.PI/2; w.position.set(x,.42,z); w.castShadow=true; van.add(w);
+  });
+
+  // empty frames leaning against the wall
+  [[3.0,.3],[3.9,-.15],[4.6,.42]].forEach(([x,r],i)=>{
+    const g=new T.Group(); g.position.set(x,.9,-4.4); g.rotation.set(0,r,.06); scene.add(g);
+    box(1.2+i*.2,1.7,.08,M(0x3a2d20,{roughness:.7}),0,0,0,g);
+    box(1.0+i*.2,1.5,.02,M(0x121214),0,0,.06,g);
+  });
+  // stacked boxes + packing foam
+  box(1.0,.8,1.0,M(0x8a7556,{roughness:.95}),2.0,.4,2.4);
+  box(.9,.7,.9,M(0x7d6a4e,{roughness:.95}),2.1,1.15,2.3);
+  box(1.3,.5,1.1,M(0x6f5e46,{roughness:.95}),.3,.25,3.0);
+  // crate used as a table for the papers
+  box(1.9,.75,1.2,M(0x7a6243,{roughness:.9}),0,.37,2.0);
+  box(.34,.02,.46,M(0xf2ecdb,{roughness:.95}),-1.2,.77,1.9).rotation.y=.2;
+  box(.34,.02,.46,M(0xf2ecdb,{roughness:.95}), 1.2,.77,1.9).rotation.y=-.2;
+
+  camera.position.set(.2,1.6,4.6);
+  return {look:new T.Vector3(-.3,1.25,-1.1)};
+}
+
+function buildBay(opened){
+  scene.fog=new T.Fog(0x08080a,8,24);
+  scene.add(new T.AmbientLight(0x303a46,.5));
+  shell(13,12,4.4,0x5c5f63,0x303033);
+  const pl=new T.PointLight(0xfff0d4,15,18,2); pl.position.set(0,4.0,1.0); scene.add(pl);
+
+  // roller door
+  const sl=M(0x4e5155,{metalness:.5,roughness:.5});
+  for(let i=0;i<13;i++) box(6.5,.3,.12,sl,0,4.3-i*.31,-5.9);
+  // yellow hazard stripes on the floor
+  for(let i=-5;i<=5;i++) box(.42,.01,2.2,M(i%2?0x1c1c1e:0xb99437,{roughness:.9}),i*.5,.012,-4.2);
+
+  // THE VAULT
+  const vault=new T.Group(); vault.position.set(4.6,0,-2.0); vault.rotation.y=-Math.PI/2.4; scene.add(vault);
+  box(3.0,3.2,.5,M(0x3c4046,{metalness:.65,roughness:.35}),0,1.6,0,vault);
+  const doorM=M(0x5a6068,{metalness:.8,roughness:.25});
+  const vdoor=box(2.4,2.7,.26,doorM,opened?-1.9:0,1.5,opened?.55:.22,vault);
+  if(opened) vdoor.rotation.y=1.0;
+  const wheelG=new T.Mesh(new T.TorusGeometry(.38,.07,10,28),M(0x8e959d,{metalness:.9,roughness:.2}));
+  wheelG.position.set(opened?-1.9:0,1.5,opened?.72:.37); vault.add(wheelG);
+  // keypad
+  const kp=box(.42,.56,.08,M(0x1a1c20,{metalness:.4}),1.35,1.6,.3,vault);
+  const kpGlow=new T.Mesh(new T.PlaneGeometry(.3,.18),
+    new T.MeshBasicMaterial({color:opened?0x6e9a5a:0xc8a04a}));
+  kpGlow.position.set(1.35,1.78,.35); vault.add(kpGlow);
+  const kpl=new T.PointLight(opened?0x6e9a5a:0xc8a04a,2.4,2.6); kpl.position.set(1.35,1.7,.6); vault.add(kpl);
+
+  // CRATE HB-7741
+  const crate=new T.Group(); crate.position.set(-1.4,0,.4); crate.rotation.y=.22; scene.add(crate);
+  const wood=M(0x8a6f49,{roughness:.92});
+  box(2.3,1.7,.9,wood,0,.85,0,crate);
+  [-.95,0,.95].forEach(y=>box(2.4,.12,.95,M(0x6d5538,{roughness:.9}),0,.85+y*.7,0,crate));
+  const stencil=new T.Mesh(new T.PlaneGeometry(1.1,.3),
+    new T.MeshBasicMaterial({map:textTex('HB-7741',{w:560,h:150,bg:'#8a6f49',fg:'#2b2217',font:'bold 86px ui-monospace, Menlo, monospace'})}));
+  stencil.position.set(0,1.15,.46); crate.add(stencil);
+
+  if(opened){
+    // lid off, the painting glowing inside
+    const lid=box(2.3,.1,.95,wood,0,.06,1.3,crate); lid.rotation.x=.3;
+    const art=new T.Mesh(new T.PlaneGeometry(1.5,1.1),
+      new T.MeshBasicMaterial({color:0x8fb6d8}));
+    art.position.set(0,1.0,.47); crate.add(art);
+    const frame=box(1.68,1.26,.06,M(0x2a2118,{roughness:.6}),0,1.0,.43,crate);
+    const glow=new T.PointLight(0x9fd0ff,5,6); glow.position.set(0,1.1,1.2); crate.add(glow);
+  }
+
+  // pallet jack + a clipboard table
+  box(1.6,.2,.7,M(0x9a3b2e,{roughness:.7}),2.4,.1,2.6);
+  box(1.6,.7,1.0,M(0x4a4d52,{roughness:.8}),0,.35,2.6);
+  box(.34,.02,.46,M(0xf2ecdb,{roughness:.95}),-1.25,.72,2.0).rotation.y=.18;
+  box(.34,.02,.46,M(0xf2ecdb,{roughness:.95}), 1.25,.72,2.0).rotation.y=-.18;
+
+  camera.position.set(0,1.65,5.0);
+  return {look:new T.Vector3(.2,1.35,-1.2)};
+}
+
+/* ============================================================
+   6. SCENE SWITCHING
+   ============================================================ */
+let lookTarget=new T.Vector3();
+function loadRoom(n,opened){
+  clearScene();
+  const r = n===1?buildGallery() : n===2?buildStaffRoom() : n===3?buildStorage() : buildBay(opened);
+  lookTarget.copy(r.look);
+  yaw=targetYaw=0; pitch=targetPitch=0;
+  baseQuat=null;
+  camera.lookAt(lookTarget);
+  baseEuler=new T.Euler().copy(camera.rotation);
+  if(n<=4 && ROOMS[n]){
+    const R=ROOMS[n];
+    document.getElementById('place').textContent=R.place;
+    document.getElementById('task').textContent=R.task;
+    for(const k in R.docs) addHotspot(k,R.docs[k].label,R.docs[k].at);
+  }
+}
+let baseQuat=null, baseEuler=null;
+
+/* ---- look controls ---- */
+function onDown(e){ dragging=true; moved=0; lastX=e.clientX??e.touches[0].clientX; lastY=e.clientY??e.touches[0].clientY; }
+function onMove(e){
+  const cx=e.clientX??(e.touches&&e.touches[0].clientX), cy=e.clientY??(e.touches&&e.touches[0].clientY);
+  if(cx==null) return;
+  if(dragging){
+    const dx=cx-lastX, dy=cy-lastY; lastX=cx; lastY=cy; moved+=Math.abs(dx)+Math.abs(dy);
+    targetYaw   = Math.max(-.85,Math.min(.85, targetYaw   - dx*.0032));
+    targetPitch = Math.max(-.32,Math.min(.32, targetPitch - dy*.0028));
+  }
+  pointer.x=(cx/innerWidth)*2-1; pointer.y=-(cy/innerHeight)*2+1;
+}
+function onUp(){ dragging=false; }
+const pointer=new T.Vector2(-9,-9);
+
+/* ---- per-frame ---- */
+function animate(){
+  requestAnimationFrame(animate);
+  if(!renderer||!scene) return;
+  const t=clock.getElapsedTime();
+  yaw   += (targetYaw-yaw)*.08;
+  pitch += (targetPitch-pitch)*.08;
+  if(baseEuler){
+    camera.rotation.set(baseEuler.x+pitch, baseEuler.y+yaw, 0, 'YXZ');
+  }
+  // hotspot pulse + label projection + hover test
+  raycaster.setFromCamera(pointer,camera);
+  const hit=raycaster.intersectObjects(hotspots.map(h=>h.core),false)[0];
+  hovered=null;
+  hotspots.forEach(h=>{
+    const s=1+Math.sin(t*2.2)*.13;
+    h.core.scale.setScalar(s);
+    h.halo.scale.setScalar(1+Math.sin(t*2.2+.6)*.16);
+    h.halo.lookAt(camera.position);
+    h.light.intensity=1.0+Math.sin(t*2.2)*.35;
+    const v=h.group.position.clone().project(camera);
+    const vis = v.z<1 && v.x>-1.1 && v.x<1.1 && v.y>-1.1 && v.y<1.1;
+    h.el.style.opacity = vis?'1':'0';
+    h.el.style.left=((v.x*.5+.5)*innerWidth)+'px';
+    h.el.style.top=((-v.y*.5+.5)*innerHeight-46)+'px';
+    const isHit = hit && hit.object===h.core;
+    if(isHit){ hovered=h; }
+    h.el.classList.toggle('hot',!!isHit);
+  });
+  canvas.style.cursor = hovered?'pointer':(dragging?'grabbing':'grab');
+  renderer.render(scene,camera);
+}
+let hovered=null;
+
+/* ============================================================
+   7. GAME FLOW
+   ============================================================ */
+let stage=1, hintsUsed=0, wrong=0;
+const panel=document.getElementById('panel'), panelBody=document.getElementById('panelBody');
+
+function openPanel(n){
+  panelBody.innerHTML=ROOMS[n].body();
+  panel.classList.add('open');
+  const inp=document.getElementById('i'+n); if(inp) setTimeout(()=>inp.focus(),80);
+}
+function closePanel(){ panel.classList.remove('open'); }
+document.getElementById('closeBtn').onclick=closePanel;
+addEventListener('keydown',e=>{ if(e.key==='Escape') closePanel(); });
+
+/* event delegation inside the panel */
+panel.addEventListener('click',e=>{
+  const c=e.target.closest('[data-check]'), h=e.target.closest('[data-hint]');
+  if(c) check(+c.dataset.check);
+  if(h) hint(+h.dataset.hint);
+});
+panel.addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&e.target.matches('input[type=text]')) check(+e.target.id.slice(1));
+});
+
+function check(n){
+  const inp=document.getElementById('i'+n), fb=document.getElementById('f'+n);
+  const raw=inp.value.trim();
+  if(!raw){ fb.className='fb bad'; fb.textContent='Enter an answer first.'; return; }
+  const g=H(raw);
+  if(ANSWERS[n].includes(g)){
+    fb.className='fb good'; fb.textContent='✓ Unlocked.';
+    document.getElementById('p'+n).classList.add('on');
+    setTimeout(()=>{
+      closePanel();
+      if(n<4){ stage=n+1; loadRoom(stage); }
+      else { loadRoom(4,true); document.getElementById('place').textContent='Zone 7 · Vault open';
+             document.getElementById('task').textContent='The painting never left the building.';
+             finish(); document.getElementById('final').classList.add('open'); }
+    },700);
+  }else{
+    wrong++; fb.className='fb bad';
+    fb.innerHTML = NUDGE[n][g] ? '✕ '+dec(NUDGE[n][g])
+      : '✕ Locked. That is not supported by the evidence — read it again, or ask for a hint.';
+    inp.select();
+  }
+}
+function hint(n){
+  const box=document.getElementById('h'+n);
+  const shown=box.querySelectorAll('.hint').length;
+  if(shown>=HINTS[n].length){
+    if(!box.dataset.done){ box.insertAdjacentHTML('beforeend','<p class="note">No more hints for this lock — talk it through with the host.</p>'); box.dataset.done=1; }
+    return;
+  }
+  box.style.display='block'; hintsUsed++;
+  box.insertAdjacentHTML('beforeend','<div class="hint"><strong>Hint '+(shown+1)+':</strong> '+dec(HINTS[n][shown])+'</div>');
+}
+
+/* click in the 3D world */
+canvas.addEventListener('pointerdown',onDown);
+addEventListener('pointermove',onMove);
+addEventListener('pointerup',onUp);
+canvas.addEventListener('click',()=>{ if(moved<6 && hovered) openPanel(stage); });
+
+/* ---- timer ---- */
+const TOTAL=20*60; let left=TOTAL, running=false, tick=null;
+const clockEl=document.getElementById('clock'), tb=document.getElementById('timerBtn');
+function render(){
+  const m=Math.floor(Math.abs(left)/60), s=Math.abs(left)%60;
+  clockEl.textContent=(left<0?'-':'')+m+':'+String(s).padStart(2,'0');
+  clockEl.className = left<0?'danger' : left<=300?'warn' : '';
+}
+function startTimer(){ if(running)return; running=true; tb.textContent='Pause'; tick=setInterval(()=>{left--;render();},1000); }
+tb.onclick=()=>{ if(running){clearInterval(tick);running=false;tb.textContent='Resume';} else startTimer(); };
+function finish(){
+  clearInterval(tick); running=false; tb.textContent='Done'; tb.disabled=true;
+  const used=TOTAL-left, m=Math.floor(Math.abs(used)/60), s=Math.abs(used)%60;
+  document.getElementById('stats').innerHTML=
+    'time to open the vault &nbsp;'+m+'m '+String(s).padStart(2,'0')+'s<br>'+
+    'hints used &nbsp;'+hintsUsed+' &nbsp;·&nbsp; wrong attempts &nbsp;'+wrong;
+}
+render();
+
+/* ---- boot ---- */
+document.getElementById('startBtn').onclick=()=>{
+  document.getElementById('intro').classList.remove('open');
+  startTimer();
+};
+try{
+  initGL();
+  loadRoom(1);
+  animate();
+  document.getElementById('boot').style.display='none';
+}catch(err){
+  document.getElementById('bootmsg').innerHTML=
+    "This computer could not start the 3D gallery.<br><br>"+
+    "Use the no-3D version instead — it has exactly the same puzzles:<br>"+
+    "<a href='classic.html' style='color:#c8a04a'>open classic.html →</a><br><br>"+
+    "<span style='font-size:12px;opacity:.6'>"+String(err).slice(0,120)+"</span>";
+}
+</script>
+</body>
+</html>

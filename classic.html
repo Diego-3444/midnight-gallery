@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Midnight Gallery — An Escape Room Investigation</title>
+<style>
+  :root{
+    --ink:#e8e3d9; --ink-dim:#9a9389; --paper:#f4efe4; --paper-ink:#1d1a15;
+    --bg:#121213; --panel:#1c1c1e; --line:#33322f;
+    --gold:#c8a04a; --red:#c05a4a; --green:#6e9a5a;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font:16px/1.6 "Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  }
+  header{
+    position:sticky; top:0; z-index:10; background:#121213ee;
+    backdrop-filter:blur(8px); border-bottom:1px solid var(--line);
+    display:flex; align-items:center; gap:16px; padding:10px 20px; flex-wrap:wrap;
+  }
+  header h1{font-size:15px; letter-spacing:.14em; text-transform:uppercase; margin:0; color:var(--gold); font-weight:600}
+  .spacer{flex:1}
+  #clock{
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:26px;
+    font-variant-numeric:tabular-nums; letter-spacing:.04em;
+  }
+  #clock.warn{color:var(--gold)} #clock.danger{color:var(--red)}
+  .locks{display:flex; gap:6px}
+  .pip{width:11px; height:11px; border:1px solid var(--ink-dim); border-radius:50%}
+  .pip.on{background:var(--green); border-color:var(--green)}
+  main{max-width:860px; margin:0 auto; padding:28px 20px 90px}
+  button{
+    font:inherit; font-size:14px; cursor:pointer; color:var(--ink);
+    background:#2a2a2c; border:1px solid var(--line); border-radius:6px; padding:8px 15px;
+  }
+  button:hover{border-color:var(--ink-dim)}
+  button.primary{background:var(--gold); border-color:var(--gold); color:#1d1a15; font-weight:600}
+  button:disabled{opacity:.4; cursor:default}
+  .doc{
+    background:var(--paper); color:var(--paper-ink); border-radius:3px;
+    padding:26px 30px; margin:20px 0; box-shadow:0 10px 30px #0008;
+  }
+  .doc h3{
+    margin:0 0 4px; font-size:12px; letter-spacing:.17em; text-transform:uppercase;
+    border-bottom:1.5px solid var(--paper-ink); padding-bottom:7px;
+  }
+  .doc .sub{font-size:12px; letter-spacing:.09em; text-transform:uppercase; color:#6c6458; margin:7px 0 16px}
+  .doc pre{
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:13px; line-height:1.75;
+    white-space:pre-wrap; margin:0; overflow-x:auto;
+  }
+  .doc p{margin:0 0 13px}
+  .doc p:last-child{margin-bottom:0}
+  .doc .signoff{margin-top:16px; font-style:italic}
+  .stmt{border-left:3px solid #c9bda4; padding:2px 0 2px 16px; margin:18px 0}
+  .stmt .who{font-weight:700; font-size:14px; letter-spacing:.03em}
+  .stmt .role{font-size:12px; color:#6c6458; text-transform:uppercase; letter-spacing:.08em; margin-bottom:9px}
+  .stmt q{font-style:italic}
+  .stage{display:none} .stage.active{display:block}
+  .tag{
+    display:inline-block; font-size:11px; letter-spacing:.15em; text-transform:uppercase;
+    color:var(--gold); border:1px solid var(--gold); border-radius:3px; padding:3px 9px; margin-bottom:14px;
+  }
+  h2{font-size:28px; margin:6px 0 10px; line-height:1.25}
+  .brief{color:var(--ink-dim); font-style:italic; border-left:2px solid var(--line); padding-left:16px; margin:16px 0 26px}
+  .task{background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:20px 22px; margin:26px 0}
+  .task .q{font-weight:600; margin:0 0 15px}
+  .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+  input[type=text]{
+    font:inherit; font-size:19px; letter-spacing:.1em; text-align:center;
+    background:#0e0e0f; color:var(--ink); border:1px solid var(--line);
+    border-radius:6px; padding:11px 14px; width:260px;
+  }
+  input[type=text]:focus{outline:none; border-color:var(--gold)}
+  .fb{min-height:24px; margin-top:13px; font-size:14px}
+  .fb.bad{color:var(--red)} .fb.good{color:var(--green)}
+  .hintbox{margin-top:16px; border-top:1px solid var(--line); padding-top:14px}
+  .hint{font-size:14px; color:var(--gold); background:#c8a04a14; border-left:2px solid var(--gold); padding:9px 14px; margin:9px 0}
+  audio{width:100%; margin:6px 0 4px; filter:invert(.9) hue-rotate(180deg)}
+  .note{font-size:13px; color:var(--ink-dim)}
+  .final{text-align:center; padding:40px 0}
+  .final .big{font-size:40px; color:var(--gold); margin:0 0 6px}
+  .accuse{text-align:left; background:var(--panel); border:1px solid var(--gold); border-radius:8px; padding:22px 24px; margin:26px 0}
+  .accuse ol{margin:12px 0 0; padding-left:22px}
+  .accuse li{margin-bottom:9px}
+  .stats{font-family:ui-monospace,Menlo,monospace; font-size:14px; color:var(--ink-dim); margin-top:22px}
+  .rules{background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:20px 24px; margin:24px 0}
+  .rules ul{margin:10px 0 0; padding-left:20px} .rules li{margin-bottom:7px}
+  .cast{display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:12px; margin:20px 0}
+  .card{background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:14px 16px}
+  .card .n{font-weight:700; font-size:15px} .card .r{font-size:12px; color:var(--ink-dim); text-transform:uppercase; letter-spacing:.07em}
+  @media print{body{background:#fff;color:#000} header,button,.task,input{display:none!important} .stage{display:block!important} .doc{box-shadow:none;border:1px solid #999}}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>The Midnight Gallery</h1>
+  <div class="locks">
+    <div class="pip" id="p1"></div><div class="pip" id="p2"></div>
+    <div class="pip" id="p3"></div><div class="pip" id="p4"></div>
+  </div>
+  <div class="spacer"></div>
+  <div id="clock">20:00</div>
+  <button id="timerBtn">Start</button>
+</header>
+
+<main>
+
+<!-- ============ STAGE 0: BRIEFING ============ -->
+<section class="stage active" id="s0">
+  <span class="tag">Case file 2-6 · Hollowbrook Museum</span>
+  <h2>A painting left this building last night. Nobody opened a door.</h2>
+
+  <div class="doc">
+    <h3>Police Briefing</h3>
+    <div class="sub">Saturday 3 October · 07:00 · Hollowbrook Museum of Modern Art</div>
+    <p>At some point on Friday night, <em>The Sleeping Lighthouse</em> by Amara Reyes was
+    taken from Gallery 4. The painting is worth more than the rest of the collection
+    together.</p>
+    <p>The main alarm never went off. No window was broken. No door was forced.
+    Whoever took the painting walked in, walked out, and used a staff access card to
+    do it.</p>
+    <p>Only four people hold cards for this wing. All four have given a statement.
+    All four sound honest. One of them is lying, and the lie is in writing.</p>
+    <p><strong>Your mission:</strong> find the thief, find the buyer, and open the
+    loading-bay vault before the museum opens at nine o'clock. You have twenty minutes.</p>
+  </div>
+
+  <h3 style="letter-spacing:.14em;text-transform:uppercase;font-size:12px;color:var(--ink-dim)">The four keyholders</h3>
+  <div class="cast">
+    <div class="card"><div class="n">Dr. Helena Voss</div><div class="r">Chief Curator</div></div>
+    <div class="card"><div class="n">Marcus Oyelaran</div><div class="r">Night Security</div></div>
+    <div class="card"><div class="n">Priya Raman</div><div class="r">Restoration Technician</div></div>
+    <div class="card"><div class="n">Tomás Adler</div><div class="r">Gift Shop Manager</div></div>
+  </div>
+
+  <div class="rules">
+    <strong>Rules</strong>
+    <ul>
+      <li>Everything is in English. Discuss your reasoning out loud, in English.</li>
+      <li>There are <strong>four locks</strong>. Each answer opens the next piece of evidence.</li>
+      <li>Read every document before you guess. The answer is always in the evidence — never a random guess.</li>
+      <li>You may ask the host for a hint at any time. Hints are free, but we count them.</li>
+      <li>When you open the vault, you must <strong>explain the case out loud</strong>. The vault is not the end — the explanation is.</li>
+      <li>One person types. Everybody talks.</li>
+    </ul>
+  </div>
+
+  <div class="row"><button class="primary" onclick="go(1);startTimer()">Open the case file</button></div>
+</section>
+
+<!-- ============ STAGE 1 ============ -->
+<section class="stage" id="s1">
+  <span class="tag">Lock 1 of 4 · Reading</span>
+  <h2>Four Keys, One Lie</h2>
+  <div class="brief">Three of these statements fit the access log perfectly. One of them
+  describes something that is physically impossible. Find the person who cannot have been
+  where they say they were.</div>
+
+  <div class="doc">
+    <h3>Document A — Access Log</h3>
+    <div class="sub">Zone 4: Gallery 4 &amp; West staff door · Friday 2 October</div>
+<pre>  TIME    EVENT    LOCATION            CARD   HOLDER
+
+  21:04   ENTRY    West staff door     #002   M. Oyelaran
+  21:38   EXIT     West staff door     #004   T. Adler
+  21:40   ENTRY    Gallery 4           #001   H. Voss
+  21:45   EXIT     Gallery 4           #001   H. Voss
+  21:52   ENTRY    Gallery 4           #002   M. Oyelaran
+  22:05   EXIT     Gallery 4           #002   M. Oyelaran
+  22:08   ENTRY    Gallery 4           #003   P. Raman
+  22:14   EXIT     Gallery 4           #003   P. Raman
+  22:16   ENTRY    Gallery 4           #002   M. Oyelaran
+
+  --- CAMERA G4-02 · automatic still every 15 minutes ---
+
+  21:45   "The Sleeping Lighthouse"  ON WALL
+  22:00   "The Sleeping Lighthouse"  ON WALL
+  22:15   "The Sleeping Lighthouse"  NOT VISIBLE — bracket empty
+  22:30   camera offline (maintenance mode)</pre>
+  </div>
+
+  <div class="doc">
+    <h3>Document B — Witness Statements</h3>
+    <div class="sub">Taken Saturday 3 October, 07:20–08:05</div>
+
+    <div class="stmt">
+      <div class="who">Dr. Helena Voss</div><div class="role">Chief Curator · card #001</div>
+      <q>I was working late on the autumn catalogue. I did a final check of Gallery 4 at
+      twenty to ten and I locked the connecting door at a quarter to ten. The Reyes was on
+      the wall — I remember straightening the label. Then I drove home. My neighbour, Mrs
+      Haddad, was putting out her bins when I arrived and we talked for a minute. That was
+      just after ten. I have not been back in this building since.</q>
+    </div>
+
+    <div class="stmt">
+      <div class="who">Marcus Oyelaran</div><div class="role">Night Security · card #002</div>
+      <q>My shift started at nine. I walked through Gallery 4 at nine fifty-two and
+      everything was normal — the Reyes was on the wall and I signed the round sheet. At
+      five past ten I heard glass breaking in the east corridor, so I left the gallery to
+      check it. I found nothing broken, nothing at all. I came back about ten minutes later
+      and the painting had gone. I phoned Dr. Voss's office immediately and left a message.
+      After that I was writing my incident report in the security office until the end of
+      my shift.</q>
+    </div>
+
+    <div class="stmt">
+      <div class="who">Priya Raman</div><div class="role">Restoration Technician · card #003</div>
+      <q>I was not even in the city on Friday. My sister got married in Monterrey on
+      Saturday and I flew out on Thursday evening — I can show you the boarding pass. The
+      last time I used my access card was Thursday afternoon, in the restoration room. I
+      have no idea how it could have opened anything on Friday night. I have worked here
+      for six years and I have never lost a card.</q>
+    </div>
+
+    <div class="stmt">
+      <div class="who">Tomás Adler</div><div class="role">Gift Shop Manager · card #004</div>
+      <q>I closed the shop and left through the west staff door at nine thirty-eight —
+      it's in the log, you can check it yourselves. I met my girlfriend at the Cineteca and
+      we watched the nine thirty showing of <em>Low Tide</em>. The film is two hours and
+      ten minutes long, so we were inside that cinema the whole time, from half past nine
+      until twenty to twelve. I came back on Saturday morning and that is when I heard
+      about the painting.</q>
+    </div>
+  </div>
+
+  <div class="doc">
+    <h3>Document C — Staff Directory</h3>
+    <div class="sub">Access levels &amp; staff lockers · west wing</div>
+<pre>  CARD  NAME              ACCESS LEVEL                      LOCKER
+
+  #001  Dr. H. Voss       all galleries · vault · bay          14
+  #002  M. Oyelaran       all galleries · loading bay          07
+  #003  P. Raman          all galleries · restoration room     22
+  #004  T. Adler          gift shop · loading bay only         31</pre>
+  </div>
+
+  <div class="task">
+    <p class="q">One statement is impossible. Open that person's staff locker.
+    <br><span class="note">Enter the locker number.</span></p>
+    <div class="row">
+      <input type="text" id="i1" placeholder="LOCKER №" autocomplete="off">
+      <button class="primary" onclick="check(1)">Open locker</button>
+      <button onclick="hint(1)">Hint</button>
+    </div>
+    <div class="fb" id="f1"></div>
+    <div class="hintbox" id="h1" style="display:none"></div>
+  </div>
+</section>
+
+<!-- ============ STAGE 2 ============ -->
+<section class="stage" id="s2">
+  <span class="tag">Lock 2 of 4 · Listening</span>
+  <h2>The Message Nobody Played</h2>
+  <div class="brief">Locker 31 is almost empty: a shop apron, a parking receipt, and a
+  museum handset still connected to Dr. Voss's office line. There is one saved message on
+  it, from Friday night. It was never played.</div>
+
+  <div class="doc">
+    <h3>Document D — Voicemail</h3>
+    <div class="sub">Friday 2 October · 22:18 · M. Oyelaran → office of H. Voss · 1 min 39 s</div>
+    <audio controls preload="metadata" src="audio/voicemail.m4a"></audio>
+    <p class="note" style="color:#6c6458">Listen as many times as you need. There is no
+    transcript — the detail you need was never written down anywhere. If the audio does not
+    play, ask the host to read the message aloud.</p>
+  </div>
+
+  <div class="task">
+    <p class="q">Marcus reads something off a camera monitor. The traffic department needs it.
+    <br><span class="note">Enter the last three digits of the licence plate.</span></p>
+    <div class="row">
+      <input type="text" id="i2" placeholder="_ _ _" autocomplete="off">
+      <button class="primary" onclick="check(2)">Run the plate</button>
+      <button onclick="hint(2)">Hint</button>
+    </div>
+    <div class="fb" id="f2"></div>
+    <div class="hintbox" id="h2" style="display:none"></div>
+  </div>
+</section>
+
+<!-- ============ STAGE 3 ============ -->
+<section class="stage" id="s3">
+  <span class="tag">Lock 3 of 4 · Reading</span>
+  <h2>Our Friend From the Aquarium</h2>
+  <div class="brief">The white van is registered to a storage unit rented under the name
+  "Silent Bids". Inside the unit: empty frames, packing foam, and a printed email thread.
+  The buyer is never named — but he has been here before, and the museum writes everything down.</div>
+
+  <div class="doc">
+    <h3>Document E — Email Thread (printed)</h3>
+    <div class="sub">Recovered from storage unit 118 · 2 messages</div>
+    <pre style="font-size:12.5px">From:    t.adler@hollowbrook-museum.org
+To:      collector@silentbids.net
+Date:    Friday 25 September, 18:02
+Subject: Re: the lighthouse</pre>
+    <p style="margin-top:14px">This is the last time I do this. The shop accounts are short
+    and the auditors arrive on the 12th, so I need the money before then.</p>
+    <p>Your client has to sign for the crate himself, in person. The name on the release
+    form has to be a name the loading-bay staff already recognise, or they will stop him at
+    the gate and open the crate. Use the same authorised contact he used for
+    <strong>both of the Pacific Aquarium loans</strong>. Nobody will look twice at that one.</p>
+    <p>And do not bring the van through the main gate.</p>
+    <hr style="border:none;border-top:1px dashed #b5a98f;margin:22px 0">
+    <pre style="font-size:12.5px">From:    collector@silentbids.net
+To:      t.adler@hollowbrook-museum.org
+Date:    Friday 25 September, 19:30
+Subject: Re: the lighthouse</pre>
+    <p style="margin-top:14px">Agreed. He will sign under that name, and the vault release
+    word stays the same as the signature: <strong>his surname, nothing else.</strong></p>
+    <p>The van is white, no markings. Ten o'clock.</p>
+    <div class="signoff">— C.</div>
+  </div>
+
+  <div class="doc">
+    <h3>Document F — Outgoing Loan Register</h3>
+    <div class="sub">Hollowbrook Museum · 2024–2026</div>
+<pre>  REF     WORK                  BORROWING INSTITUTION
+          authorised contact
+
+  L-114   "Harbour Light"       Northern Harbour Trust
+          J. Mbeki
+
+  L-118   "Blue Hour"           Pacific Aquarium Foundation
+          O. Castellanos
+
+  L-119   "Tidewater III"       Northern Harbour Trust
+          J. Mbeki
+
+  L-121   "Salt and Iron"       Pacific Aquarium Foundation
+          O. Castellanos
+
+  L-123   "Low Tide Study"      Cineteca Cultural Programme
+          R. Ferreira</pre>
+  </div>
+
+  <div class="task">
+    <p class="q">Who signed for the crate?
+    <br><span class="note">Enter the surname only.</span></p>
+    <div class="row">
+      <input type="text" id="i3" placeholder="SURNAME" autocomplete="off">
+      <button class="primary" onclick="check(3)">Name the buyer</button>
+      <button onclick="hint(3)">Hint</button>
+    </div>
+    <div class="fb" id="f3"></div>
+    <div class="hintbox" id="h3" style="display:none"></div>
+  </div>
+</section>
+
+<!-- ============ STAGE 4 ============ -->
+<section class="stage" id="s4">
+  <span class="tag">Lock 4 of 4 · The Vault</span>
+  <h2>Zone 7</h2>
+  <div class="brief">The name opens the loading-bay office. Two documents are still sitting
+  in the out-tray — and this log was never sent to the police, because Zone 7 keeps its own
+  records, on a twelve-hour clock.</div>
+
+  <div class="doc">
+    <h3>Document G — Crate Release Form</h3>
+    <div class="sub">Zone 7 · loading bay</div>
+<pre>  CRATE           HB-7741
+  CONTENTS        1 framed work — DO NOT OPEN
+  RELEASED TO     O. CASTELLANOS   (signature on file)
+  DATE            Friday 2 October
+  TIME OF RELEASE  ____________
+
+  ───────────────────────────────────────────────
+  VAULT KEYPAD · ZONE 7
+
+  Enter the time the crate left this building.
+  24-hour format. Four digits. No colon.
+  ───────────────────────────────────────────────</pre>
+  </div>
+
+  <div class="doc">
+    <h3>Document H — Loading Bay Log (Zone 7)</h3>
+    <div class="sub">Friday 2 October · local 12-hour clock</div>
+<pre>  TIME       EVENT   CARD   HOLDER       NOTE
+
+   7:15 AM   ENTRY   #004   T. Adler     shop stock delivery
+   7:52 AM   EXIT    #004   T. Adler
+   9:55 PM   ENTRY   #004   T. Adler
+  10:40 PM   ENTRY    ---   no card      bay door held 2 min
+  11:02 PM   EXIT    #004   T. Adler     crate HB-7741
+                                         door held 4 min
+  11:06 PM   EXIT     ---   no card</pre>
+  </div>
+
+  <div class="task">
+    <p class="q">Open the vault.
+    <br><span class="note">Four digits, 24-hour format.</span></p>
+    <div class="row">
+      <input type="text" id="i4" placeholder="_ _ _ _" autocomplete="off">
+      <button class="primary" onclick="check(4)">Enter code</button>
+      <button onclick="hint(4)">Hint</button>
+    </div>
+    <div class="fb" id="f4"></div>
+    <div class="hintbox" id="h4" style="display:none"></div>
+  </div>
+</section>
+
+<!-- ============ STAGE 5: FINAL ============ -->
+<section class="stage" id="s5">
+  <div class="final">
+    <p class="big">The vault is open.</p>
+    <p><em>The Sleeping Lighthouse</em> is inside crate HB-7741, wrapped in a shop apron.
+    It never left the building.</p>
+  </div>
+
+  <div class="accuse">
+    <strong>You have the painting. Now close the case — out loud, in English.</strong>
+    <p class="note" style="margin-top:10px">The host will ask each of you one of these.
+    Answer in full sentences and say <em>which document or recording</em> proves it.</p>
+    <ol>
+      <li>Who took the painting, and what exactly was wrong with their statement?</li>
+      <li>Tomás Adler's card only opens the gift shop and the loading bay. So <strong>how did he get into Gallery 4</strong>, and how do you know?</li>
+      <li>Priya Raman's card opened Gallery 4 at 22:08. Why is she not the thief?</li>
+      <li>Who was the buyer, and how did you work out his name from two different documents?</li>
+      <li>The camera went into "maintenance mode" at 22:30. Who could do that, and why does that matter?</li>
+      <li>Give one piece of information that you could <strong>only</strong> get from the voicemail.</li>
+    </ol>
+  </div>
+
+  <div class="final">
+    <div class="stats" id="stats"></div>
+    <p style="margin-top:26px"><button onclick="location.reload()">Reset for the next team</button></p>
+  </div>
+</section>
+
+</main>
+
+<script>
+/* ---------- answer checking (hashed so the source does not spoil it) ---------- */
+const dec=s=>new TextDecoder().decode(Uint8Array.from(atob(s),c=>c.charCodeAt(0)));
+function norm(s){return s.normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().replace(/[^a-z0-9]/g,"");}
+function H(s){let x=5381;for(const c of norm(s))x=((x*33)^c.charCodeAt(0))>>>0;return x.toString(16);}
+
+const ANSWERS={
+  1:["596867","a15d9e7b","a1cf0bb","214b6bff"],
+  2:["b8658ba","119926cb"],
+  3:["afe60376","faaaa4d9"],
+  4:["7c548f46"]
+};
+
+const NUDGE={1:{"596802":"TG9ja2VyIDA3IGlzIE1hcmN1cy4gSGUgaXMgdGhlIG9uZSB3aG8gcmVwb3J0ZWQgdGhlIHRoZWZ0LCBhbmQgaGUgaXMgb24gdGhlIGxvZyBleGFjdGx5IHdoZXJlIGhlIHNheXMgaGUgd2FzLiBSZWFkIHRoZSBmb3VydGggc3RhdGVtZW50IGFnYWluLg==","596820":"TG9ja2VyIDE0IGlzIERyLiBWb3NzLiBIZXIgc3RhdGVtZW50IG1hdGNoZXMgRG9jdW1lbnQgQSBsaW5lIGJ5IGxpbmUg4oCUIGFuZCBoZXIgbmVpZ2hib3VyIHNhdyBoZXIgYXQgaG9tZS4gVHJ5IGFnYWluLg==","596845":"TG9ja2VyIDIyIGlzIFByaXlhLiBIZXIgY2FyZCA8ZW0+d2FzPC9lbT4gdXNlZCBhdCAyMjowOCDigJQgYnV0IHNoZSB3YXMgYXQgYSB3ZWRkaW5nIGluIE1vbnRlcnJleS4gU28gd2hvIHVzZWQgaXQ/","7c76f1fc":"RHIuIFZvc3MncyBzdGF0ZW1lbnQgbWF0Y2hlcyBEb2N1bWVudCBBIGxpbmUgYnkgbGluZSwgYW5kIGhlciBuZWlnaGJvdXIgc2F3IGhlciBhdCBob21lLiBUcnkgYWdhaW4u","e9a3e906":"TWFyY3VzIHJlcG9ydGVkIHRoZSB0aGVmdCBoaW1zZWxmIGFuZCB0aGUgbG9nIHB1dHMgaGltIGV4YWN0bHkgd2hlcmUgaGUgc2F5cy4gUmVhZCB0aGUgZm91cnRoIHN0YXRlbWVudCBhZ2Fpbi4=","b9a7214":"UHJpeWEncyBjYXJkIHdhcyB1c2VkIGF0IDIyOjA4IOKAlCBidXQgc2hlIHdhcyBhdCBhIHdlZGRpbmcgaW4gTW9udGVycmV5LiBTbyB3aG8gdXNlZCBpdD8="},2:{},3:{"a6655ed":"Si4gTWJla2kgaXMgdGhlIGNvbnRhY3QgZm9yIHRoZSBOb3J0aGVybiBIYXJib3VyIFRydXN0LCBub3QgdGhlIGFxdWFyaXVtLiBSZWFkIERvY3VtZW50IEYgYWdhaW4u","6b618ee7":"Si4gTWJla2kgaXMgdGhlIGNvbnRhY3QgZm9yIHRoZSBOb3J0aGVybiBIYXJib3VyIFRydXN0LCBub3QgdGhlIGFxdWFyaXVtLiBSZWFkIERvY3VtZW50IEYgYWdhaW4u","aa600339":"Ui4gRmVycmVpcmEgaXMgdGhlIENpbmV0ZWNhIGNvbnRhY3Qg4oCUIGEgY29pbmNpZGVuY2UsIG5vdCB5b3VyIGJ1eWVyLiBXaGljaCBpbnN0aXR1dGlvbiBhcHBlYXJzIDxlbT50d2ljZTwvZW0+Pw==","7ca5fb6b":"Ui4gRmVycmVpcmEgaXMgdGhlIENpbmV0ZWNhIGNvbnRhY3Qg4oCUIGEgY29pbmNpZGVuY2UsIG5vdCB5b3VyIGJ1eWVyLiBXaGljaCBpbnN0aXR1dGlvbiBhcHBlYXJzIDxlbT50d2ljZTwvZW0+Pw=="},4:{"7c540ba7":"UmlnaHQgZXZlbnQsIHdyb25nIGNsb2NrLiBab25lIDcgd3JpdGVzIGEgMTItaG91ciBjbG9jazsgdGhlIGtleXBhZCB3YW50cyAyNC1ob3VyLg==","e1859fba":"UmlnaHQgZXZlbnQsIHdyb25nIGZvcm1hdC4gQ29udmVydCAxMTowMiBQTSB0byB0aGUgMjQtaG91ciBjbG9jayDigJQgZm91ciBkaWdpdHMsIG5vIGNvbG9uLCBubyBsZXR0ZXJzLg=="}};
+
+const HINTS={1:["VGhyZWUgc3RhdGVtZW50cyBhZ3JlZSB3aXRoIERvY3VtZW50IEEuIFN0YXJ0IGJ5IGNoZWNraW5nIGVhY2ggcGVyc29uJ3MgdGltZXMgYWdhaW5zdCB0aGUgbG9nLCBvbmUgbGluZSBhdCBhIHRpbWUu","Tm9ib2R5IGNvbnRyYWRpY3RzIHRoZSBsb2cuIE9uZSBwZXJzb24gY29udHJhZGljdHMgPGVtPnRoZW1zZWx2ZXM8L2VtPi4gTG9vayBmb3IgYSBzdGF0ZW1lbnQgd2l0aCB0d28gdGltZXMgaW4gaXQgdGhhdCBjYW5ub3QgYm90aCBiZSB0cnVlLg==","QWRsZXIgc2F5cyBoZSBsZWZ0IHRoZSBtdXNldW0gYXQgOTozOCDigJQgYW5kIHRoYXQgaGUgd2FzIGluc2lkZSB0aGUgY2luZW1hIGZyb20gOTozMCBvbndhcmRzLiBUaG9zZSB0d28gdGhpbmdzIGNhbm5vdCBib3RoIGJlIHRydWUuIERvY3VtZW50IEMgZ2l2ZXMgeW91IGhpcyBsb2NrZXIu"],2:["TWFyY3VzIGFza3MgRHIuIFZvc3MgdG8gd3JpdGUgdHdvIHRoaW5ncyBkb3duLiBUaGUgcGxhdGUgaXMgb25lIG9mIHRoZW0u","SGUgc2F5cyBoZSBpcyByZWFkaW5nIGl0IG9mZiBhIGNhbWVyYSBtb25pdG9yLCBhbmQgaGUgcmVwZWF0cyB0aGUgdGhyZWUgZGlnaXRzIHNsb3dseSwgdHdpY2Uu","TGlzdGVuIGZvciDigJxmb3VyIOKAlCBuaW5lIOKAlCB0d2/igJ0gbmVhciB0aGUgZW5kIG9mIHRoZSBtZXNzYWdlLg=="],3:["VGhlIGVtYWlsIG5ldmVyIG5hbWVzIHRoZSBidXllci4gSXQgdGVsbHMgeW91IHdoZXJlIHRvIGxvb2sgaGltIHVwLg==","V2hpY2ggaW5zdGl0dXRpb24gYXBwZWFycyB0d2ljZSBpbiBEb2N1bWVudCBGPyBUaGUgYnV5ZXIgdXNlZCB0aGUgc2FtZSBhdXRob3Jpc2VkIGNvbnRhY3QgZm9yIGJvdGggb2YgdGhvc2UgbG9hbnMu","TC0xMTggYW5kIEwtMTIxIGJvdGggd2VudCB0byB0aGUgUGFjaWZpYyBBcXVhcml1bSBGb3VuZGF0aW9uLCBhbmQgYm90aCBsaXN0IHRoZSBzYW1lIGNvbnRhY3Q6IE8uIENhc3RlbGxhbm9zLiBUaGUgZW1haWwgc2F5cyB0aGUgcmVsZWFzZSB3b3JkIGlzIGhpcyBzdXJuYW1lLg=="],4:["RG9jdW1lbnQgSCBoYXMgc2l4IGxpbmVzLiBPbmx5IG9uZSBvZiB0aGVtIGlzIHRoZSBjcmF0ZSBsZWF2aW5nIHRoZSBidWlsZGluZy4=","VGhlIGNyYXRlIGlzIG5hbWVkIG9uIGV4YWN0bHkgb25lIGxpbmU6IEhCLTc3NDEsIGFuIEVYSVQgYXQgMTE6MDIgUE0u","MTE6MDIgUE0gaW4gMjQtaG91ciBmb3JtYXQgaXMgMjM6MDIuIFRoZSBrZXlwYWQgd2FudHMgZm91ciBkaWdpdHMgYW5kIG5vIGNvbG9uLg=="]};
+
+let hintsUsed=0, wrong=0, solved=0;
+
+function go(n){
+  document.querySelectorAll('.stage').forEach(s=>s.classList.remove('active'));
+  document.getElementById('s'+n).classList.add('active');
+  window.scrollTo({top:0,behavior:'smooth'});
+  const inp=document.getElementById('i'+n); if(inp) setTimeout(()=>inp.focus(),400);
+}
+
+function check(n){
+  const inp=document.getElementById('i'+n), fb=document.getElementById('f'+n);
+  const raw=inp.value.trim();
+  if(!raw){fb.className='fb bad'; fb.textContent='Enter an answer first.'; return;}
+  const g=H(raw);
+  if(ANSWERS[n].includes(g)){
+    fb.className='fb good'; fb.textContent='✓ Unlocked.';
+    document.getElementById('p'+n).classList.add('on');
+    solved=Math.max(solved,n);
+    setTimeout(()=>go(n+1),750);
+    if(n===4) finish();
+  }else{
+    wrong++;
+    fb.className='fb bad';
+    fb.innerHTML = NUDGE[n][g] ? '✕ ' + dec(NUDGE[n][g])
+                 : '✕ Locked. That is not supported by the evidence — read it again, or ask for a hint.';
+    inp.select();
+  }
+}
+
+function hint(n){
+  const box=document.getElementById('h'+n);
+  const shown=box.querySelectorAll('.hint').length;
+  if(shown>=HINTS[n].length){
+    if(!box.dataset.done){box.insertAdjacentHTML('beforeend','<p class="note">No more hints for this lock — talk it through with the host.</p>'); box.dataset.done=1;}
+    return;
+  }
+  box.style.display='block'; hintsUsed++;
+  box.insertAdjacentHTML('beforeend','<div class="hint"><strong>Hint '+(shown+1)+':</strong> '+dec(HINTS[n][shown])+'</div>');
+}
+
+document.querySelectorAll('input[type=text]').forEach(inp=>{
+  inp.addEventListener('keydown',e=>{if(e.key==='Enter')check(+inp.id.slice(1));});
+});
+
+/* ---------- timer ---------- */
+const TOTAL=20*60;
+let left=TOTAL, running=false, tick=null;
+const clock=document.getElementById('clock'), tb=document.getElementById('timerBtn');
+
+function render(){
+  const m=Math.floor(Math.abs(left)/60), s=Math.abs(left)%60;
+  clock.textContent=(left<0?'-':'')+m+':'+String(s).padStart(2,'0');
+  clock.className = left<0 ? 'danger' : left<=300 ? 'warn' : '';
+}
+function startTimer(){
+  if(running) return;
+  running=true; tb.textContent='Pause';
+  tick=setInterval(()=>{left--; render();},1000);
+}
+tb.onclick=()=>{
+  if(running){clearInterval(tick); running=false; tb.textContent='Resume';}
+  else startTimer();
+};
+function finish(){
+  clearInterval(tick); running=false; tb.textContent='Done'; tb.disabled=true;
+  const used=TOTAL-left, m=Math.floor(Math.abs(used)/60), s=Math.abs(used)%60;
+  document.getElementById('stats').innerHTML =
+    'time to open the vault &nbsp;'+m+'m '+String(s).padStart(2,'0')+'s<br>'+
+    'hints used &nbsp;'+hintsUsed+' &nbsp;·&nbsp; wrong attempts &nbsp;'+wrong;
+}
+render();
+</script>
+</body>
+</html>
