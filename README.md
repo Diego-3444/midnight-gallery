@@ -1,6 +1,8 @@
 # THE MIDNIGHT GALLERY
 ### An escape room investigation · Unit 2 · Assessment 2.6
 
+**By Diego Esquivel Martínez and Santiago**
+
 A painting disappeared from a locked gallery and the alarm never went off. Four people had
 keys. One of them is lying — and the lie is in writing.
 
@@ -11,7 +13,7 @@ keys. One of them is lying — and the lie is in writing.
 ## ▶ Play it
 
 **Online — nothing to install:**
-👉 **[Open The Midnight Gallery](https://PLACEHOLDER-USER.github.io/midnight-gallery/)**
+👉 **[Open The Midnight Gallery](https://diego-3444.github.io/midnight-gallery/)**
 
 You walk through four 3D rooms — the gallery the painting vanished from, the staff lockers,
 a storage unit, and the loading bay. Drag to look around, click a glowing marker to read the
@@ -76,7 +78,7 @@ submitted privately on Blackboard and added here afterwards.
   hints."** Three progressive hints per lock, plus specific replies to the wrong answers
   teams actually try — a team that guesses the wrong suspect is told *why* that suspect is
   cleared, not just "incorrect".
-- **"Every team member must speak and help run the activity."** Four named speaking roles.
+- **"Every team member must speak and help run the activity."** Two named speaking roles, balanced so both hosts speak for a similar length of time.
 - **"Test the full game and check that another team can finish it in 15–20 minutes."**
   ⚠️ **Still to do — see the checklist below.**
 
@@ -84,8 +86,8 @@ submitted privately on Blackboard and added here afterwards.
 
 ## Before you submit — checklist
 
-- [ ] Team names filled in on the host guide and the presentation script
-- [ ] Speaking roles assigned (Speaker 1–4)
+- [x] Team names filled in on the host guide and the presentation script
+- [x] Speaking roles assigned (Diego = briefing + Locks 1 & 3, Santiago = Lock 2 + Lock 4 + closing)
 - [ ] **Playtested with another team and timed** → results written into the host guide §8
 - [ ] The audio plays on the actual presentation computer
 - [ ] All four locks tested by typing the answers

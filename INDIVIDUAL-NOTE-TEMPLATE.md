@@ -13,8 +13,8 @@
 ---
 
 **Name:**
-**Team:** The Midnight Gallery — ____________________ · ____________________ · ____________________ · ____________________
-**My hosting role:** Speaker ___ ( Briefing / Evidence Officer / Audio Officer / Case Closer )
+**Team:** The Midnight Gallery — Diego Esquivel Martínez · Santiago
+**My hosting role:** ( Speaker 1 — briefing, Locks 1 & 3  /  Speaker 2 — Lock 2 audio, Lock 4, closing )
 
 ---
 
