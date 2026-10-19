@@ -120,6 +120,21 @@
 
 <div id="boot"><div><div class="t">Hollowbrook Museum</div><div class="m" id="bootmsg">Entering the building…</div></div></div>
 
+<script>
+  // If the 3D module has not booted in 9 seconds, something failed before our
+  // own error handler could run (module blocked, old browser, bad asset path).
+  window.__booted = false;
+  setTimeout(function(){
+    if (window.__booted) return;
+    var m = document.getElementById('bootmsg');
+    if (!m) return;
+    m.innerHTML =
+      "The 3D gallery did not start on this computer.<br><br>" +
+      "Use the version without 3D instead. It has exactly the same four puzzles:<br><br>" +
+      "<a href='classic.html' style='color:#c8a04a;font-size:17px'>Open classic.html &rarr;</a>";
+  }, 9000);
+</script>
+
 <div id="labels"></div>
 
 <div id="bar">
@@ -204,12 +219,8 @@
   </div>
 </div></div>
 
-<script type="importmap">
-{"imports":{"three":"./vendor/three.module.min.js"}}
-</script>
-
 <script type="module">
-import * as T from 'three';
+import * as T from './vendor/three.module.min.js';
 
 /* ============================================================
    1. PUZZLE LOGIC  (answers hashed so View Source does not spoil)
@@ -862,8 +873,10 @@ try{
   initGL();
   loadRoom(1);
   animate();
+  window.__booted=true;
   document.getElementById('boot').style.display='none';
 }catch(err){
+  window.__booted=true;
   document.getElementById('bootmsg').innerHTML=
     "This computer could not start the 3D gallery.<br><br>"+
     "Use the no-3D version instead — it has exactly the same puzzles:<br>"+
